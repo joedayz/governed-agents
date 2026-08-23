@@ -1,0 +1,73 @@
+kcp_version: "0.14"
+project: equipo-agentes
+version: 1.0.0
+updated: 2026-08-22
+
+# =====================================================================
+# EL EQUIPO: cada agente tiene una CAPACIDAD GANADA (cap).
+# Escala de autoridad: observe(1) < explain(2) < propose(3) < prepare(4) < execute(5)
+# =====================================================================
+agentes:
+  retriever:  { cap: explain, usa_llm: true,  hace: "lee y resume protocolos y FAQ" }
+  assessor:   { cap: propose, usa_llm: false, hace: "calcula prioridad y accion con reglas" }
+  drafter:    { cap: propose, usa_llm: true,  hace: "redacta la respuesta al paciente" }
+  executor:   { cap: propose, usa_llm: false, hace: "ejecuta acciones aprobadas" }
+  # ojo: executor tiene cap 'propose', NO 'execute' — aún no se lo ha ganado.
+
+# =====================================================================
+# EL PLAYBOOK: cada paso declara quién lo corre, qué autoridad se le
+# OTORGA (granted) y qué autoridad NECESITA (needs).
+# Regla de oro:  efectivo = min(granted, cap del agente)   ["lowest-of"]
+#                si needs > efectivo  ->  ESCALAR A HUMANO
+# =====================================================================
+playbook:
+  id: gestionar-cita-clinica
+  pasos:
+    - id: 1
+      titulo: "Recuperar el protocolo y el contexto"
+      agente: retriever
+      granted: explain
+      needs: explain
+
+    - id: 2
+      titulo: "Calcular prioridad clinica y ventana de atencion"
+      agente: assessor
+      granted: propose
+      needs: propose
+
+    - id: 3
+      titulo: "Avisar al coordinador si el caso es prioridad media"
+      agente: assessor
+      granted: explain
+      needs: explain
+      tipo_humano: inform          # FYI: notifica, no bloquea
+
+    - id: 4
+      titulo: "Redactar la respuesta al paciente"
+      agente: drafter
+      granted: propose
+      needs: propose
+
+    - id: 5
+      titulo: "Confirmar la reserva de la cita (compromete agenda)"
+      agente: executor
+      granted: propose
+      needs: execute               # propose(3) < execute(5) -> short by 2 -> AUTORIZAR
+
+    - id: 6
+      titulo: "Registrar el resultado en salidas/"
+      agente: executor
+      granted: execute             # aquí SÍ se le otorga... pero su cap es propose:
+      needs: propose               # efectivo = min(execute, propose) = propose. Alcanza.
+
+    - id: 7
+      titulo: "Proponer una mejora al protocolo"
+      agente: assessor
+      granted: propose
+      needs: propose
+      tipo_humano: learning        # el humano acepta o rechaza el aprendizaje
+
+# El executor solo puede tocar salidas/ (allowlist, fail-closed — Fase 1)
+action_scope:
+  executor:
+    paths: [salidas/]

@@ -1,0 +1,50 @@
+kcp_version: "0.14"
+project: agente1
+version: 1.0.0
+updated: 2026-08-21
+
+# ------------------------------------------------------------------
+# Unidades de conocimiento: el "mapa" que el agente puede navegar.
+# Cada unidad responde una pregunta (intent) para una audiencia.
+# ------------------------------------------------------------------
+units:
+  - id: producto-faq
+    path: docs/producto-faq.md
+    intent: "¿Qué es JoeDayz Academy y qué cursos ofrece?"
+    scope: project
+    audience: [agent, human]
+    validated: 2026-08-21
+    triggers: [cursos, academia, precios, catalogo]
+
+  - id: politica-reembolsos
+    path: docs/politica-reembolsos.md
+    intent: "¿Cuál es la política de reembolsos y sus plazos?"
+    scope: project
+    audience: [agent]
+    validated: 2026-08-21
+    triggers: [reembolso, devolucion, cancelacion, dinero]
+
+  - id: politica-vieja
+    path: docs/politica-reembolsos-2024.md
+    intent: "Política de reembolsos antigua (histórica, NO usar)"
+    scope: project
+    audience: [agent]
+    validated: 2024-01-15
+    deprecated: true          # el agente NO debe usarla para trabajo nuevo
+    triggers: [reembolso]
+
+  # ----------------------------------------------------------------
+  # SKILL: una capacidad con autoridad declarada (action_scope).
+  # Esto es lo que convierte "espero que se porte bien" en una regla.
+  # ----------------------------------------------------------------
+  - id: soporte-skill
+    path: SKILL.md
+    kind: skill
+    intent: "Responder preguntas de clientes usando SOLO los docs y guardar la respuesta en notes/"
+    scope: project
+    audience: [agent]
+    validated: 2026-08-21
+    action_scope:
+      tools: [read_file, list_files, write_file]   # allowlist de herramientas
+      paths: [docs/, notes/]                        # allowlist de rutas (prefijos)
+      # Lo NO declarado queda prohibido: secrets/, comandos de shell, red, etc.
