@@ -1,0 +1,29 @@
+{
+  "name": "equipo-agentes-con-kcp",
+  "version": "1.0.0",
+  "description": "Equipo de agentes de triaje de citas, gobernado con las herramientas oficiales del ecosistema KCP (kcp-agent + kcp-harness).",
+  "main": "index.js",
+  "scripts": {
+    "validate": "kcp-agent validate . --json",
+    "plan": "kcp-agent plan \"Procesar la solicitud de cita de un paciente con fiebre leve y dolor de garganta\" --manifest . --trace",
+    "harness:check": "kcp-harness check",
+    "harness:serve": "kcp-harness serve",
+    "typecheck": "tsc --noEmit",
+    "orquestar": "tsx orquestador.ts",
+    "orquestar:romper-alcance": "tsx orquestador.ts \"fiebre leve y dolor de garganta\" --romper-alcance",
+    "test": "npm run typecheck && npm run validate && npm run harness:check && npm run orquestar && npm run orquestar:romper-alcance"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "kcp-agent": "^0.28.0",
+    "kcp-harness": "^0.15.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

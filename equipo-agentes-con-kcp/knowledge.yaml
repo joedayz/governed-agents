@@ -1,0 +1,149 @@
+kcp_version: "0.30"
+project: equipo-agentes-con-kcp
+version: 1.0.0
+updated: "2026-08-26"
+language: es
+
+# =====================================================================
+# Este manifiesto es el mismo caso de "equipo-agentes" (triaje de citas
+# clínicas), pero escrito en KCP nativo v0.30 y verificado con las
+# herramientas reales del ecosistema KCP ("Thor"):
+#   - kcp-agent   -> planificador de referencia (plan / validate / trace)
+#   - kcp-harness -> proxy de gobernanza en runtime (kcp-harness serve)
+# En vez de un orquestador Python casero que interpreta este YAML,
+# aquí el YAML se interpreta con las herramientas oficiales del protocolo.
+# =====================================================================
+
+trust:
+  provenance:
+    publisher: "equipo-agentes-con-kcp"
+
+payment:
+  default_tier: free
+  methods:
+    - type: free
+
+units:
+  # -------------------------------------------------------------
+  # KNOWLEDGE: hechos que el equipo puede citar (kind por defecto)
+  # -------------------------------------------------------------
+  - id: protocolo-triaje
+    path: docs/protocolo-triaje.md
+    intent: "¿Cómo se prioriza clínicamente una solicitud de cita?"
+    scope: project
+    audience: [agent]
+    validated: "2026-08-26"
+    triggers: [triaje, prioridad, sintomas, urgencia]
+
+  - id: faq-agenda
+    path: docs/faq-agenda.md
+    intent: "¿Cómo funciona la agenda de citas y quién puede confirmarla?"
+    scope: project
+    audience: [agent]
+    validated: "2026-08-26"
+    depends_on: [protocolo-triaje]
+    triggers: [agenda, cita, confirmar, cancelar]
+
+  # -------------------------------------------------------------
+  # SKILLS: capacidades gobernadas, cada una con action_scope propio
+  # -------------------------------------------------------------
+  - id: retriever-skill
+    path: skills/retriever/SKILL.md
+    kind: skill
+    intent: "Leer protocolo y FAQ y resumir el contexto relevante del caso"
+    scope: project
+    audience: [agent]
+    validated: "2026-08-26"
+    load_eligible: true
+    triggers: [retriever, contexto, resumen]
+    action_scope:
+      tools: ["read_file"]
+      capabilities: ["kcp.explain"]
+
+  - id: assessor-skill
+    path: skills/assessor/SKILL.md
+    kind: skill
+    intent: "Calcular prioridad clínica y ventana de atención con reglas, no juicio de modelo"
+    scope: project
+    audience: [agent]
+    validated: "2026-08-26"
+    load_eligible: true
+    depends_on: [protocolo-triaje]
+    triggers: [assessor, prioridad, regla]
+    action_scope:
+      tools: ["read_file"]
+      capabilities: ["kcp.propose"]
+
+  - id: drafter-skill
+    path: skills/drafter/SKILL.md
+    kind: skill
+    intent: "Redactar la respuesta al paciente a partir de hechos ya calculados"
+    scope: project
+    audience: [agent]
+    validated: "2026-08-26"
+    load_eligible: true
+    depends_on: [assessor-skill]
+    triggers: [drafter, redactar, respuesta]
+    action_scope:
+      tools: ["read_file"]
+      capabilities: ["kcp.propose"]
+
+  - id: executor-skill
+    path: skills/executor/SKILL.md
+    kind: skill
+    intent: "Ejecutar acciones aprobadas dentro de salidas/ únicamente"
+    scope: project
+    audience: [agent]
+    validated: "2026-08-26"
+    load_eligible: true
+    triggers: [executor, ejecutar, salidas]
+    action_scope:
+      tools: ["read_file", "write_file"]
+      paths: ["salidas/"]
+      capabilities: ["kcp.propose"]
+
+  # -------------------------------------------------------------
+  # PLAYBOOK: el procedimiento compuesto y con checkpoints (v0.29)
+  # Cada paso declara granted/needs; efectivo = min(granted, cap).
+  # -------------------------------------------------------------
+  - id: gestionar-cita-clinica
+    path: docs/playbook-gestionar-cita.md
+    kind: playbook
+    intent: "¿Cómo se procesa de punta a punta una solicitud de cita clínica?"
+    scope: project
+    audience: [agent]
+    validated: "2026-08-26"
+    load_eligible: true
+    triggers: [playbook, cita, triaje, agenda]
+    depends_on:
+      - retriever-skill
+      - assessor-skill
+      - drafter-skill
+      - executor-skill
+    action_scope:
+      # Techo del playbook completo: ningún paso puede exceder "propose".
+      # Confirmar una cita real (needs: execute) siempre escala a un humano.
+      capabilities: ["kcp.propose"]
+
+relationships:
+  - from: protocolo-triaje
+    to: assessor-skill
+    type: enables
+  - from: assessor-skill
+    to: drafter-skill
+    type: enables
+  - from: faq-agenda
+    to: executor-skill
+    type: context
+  - from: retriever-skill
+    to: gestionar-cita-clinica
+    type: enables
+  - from: assessor-skill
+    to: gestionar-cita-clinica
+    type: enables
+  - from: drafter-skill
+    to: gestionar-cita-clinica
+    type: enables
+  - from: executor-skill
+    to: gestionar-cita-clinica
+    type: enables
